@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import StorySegment from './components/StorySegment';
 import ChoiceButton from './components/ChoiceButton';
 import LoadingSpinner from './components/LoadingSpinner';
-import { getNewGame, getGameUpdate } from './services/geminiService';
+import { getScenarioFromPrompt, generateRandomScenario, getGameUpdate, parseJsonResponse } from './services/geminiService';
+import { SCENARIO_PROMPTS } from './services/scenarios';
 import type { StoryPart, GameChoice, GameSetupState, GameResultState, Source } from './types';
 
 // Book Icon SVG
@@ -31,6 +31,9 @@ function App() {
   const [historicalOutcome, setHistoricalOutcome] = useState<string | null>(null);
   const [sources, setSources] = useState<Source[] | null>(null);
   const storyEndRef = useRef<HTMLDivElement>(null);
+  
+  const [preloadedScenario, setPreloadedScenario] = useState<GameSetupState | null>(null);
+  const isPreloading = useRef(false);
 
   const scrollToBottom = () => {
     storyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -39,48 +42,94 @@ function App() {
   useEffect(() => {
     scrollToBottom();
   }, [storyHistory, isLoading, analysis, historicalOutcome, sources]);
+  
+  const preloadRandomScenario = async () => {
+    if (isPreloading.current) return;
+    isPreloading.current = true;
+    try {
+        const scenarioData = await generateRandomScenario();
+        setPreloadedScenario(scenarioData);
+    } catch (error) {
+        console.error("Failed to preload random scenario:", error);
+        setPreloadedScenario(null); // Clear on failure
+    } finally {
+        isPreloading.current = false;
+    }
+  };
+  
+  // Initial load effect
+  useEffect(() => {
+    const initialSetup = async () => {
+        setIsLoading(true);
+        try {
+            const randomIndex = Math.floor(Math.random() * SCENARIO_PROMPTS.length);
+            const initialPrompt = SCENARIO_PROMPTS[randomIndex];
+            const initialState = await getScenarioFromPrompt(initialPrompt);
+            setStoryHistory([{ type: 'ai', text: initialState.narrative }]);
+            setCurrentChoices(initialState.choices);
+            preloadRandomScenario(); 
+        } catch (error) {
+            console.error("Failed to start the first game:", error);
+            setStoryHistory([{ type: 'ai', text: 'Đã có lỗi xảy ra khi bắt đầu trò chơi. Vui lòng làm mới trang.' }]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    initialSetup();
+  }, []);
 
   const startNewGame = async () => {
     setIsLoading(true);
-    setStoryHistory([]);
-    setCurrentChoices([]);
     setGameEnded(false);
     setAnalysis(null);
     setHistoricalOutcome(null);
     setSources(null);
-    try {
-      const initialState: GameSetupState = await getNewGame();
-      setStoryHistory([{ type: 'ai', text: initialState.narrative }]);
-      setCurrentChoices(initialState.choices);
-    } catch (error) {
-      console.error("Failed to start a new game:", error);
-      setStoryHistory([{ type: 'ai', text: 'Đã có lỗi xảy ra khi bắt đầu trò chơi. Vui lòng thử lại.' }]);
-    } finally {
-      setIsLoading(false);
+    setCurrentChoices([]);
+    setStoryHistory([]);
+
+    const setupGame = (scenarioData: GameSetupState) => {
+        setStoryHistory([{ type: 'ai', text: scenarioData.narrative }]);
+        setCurrentChoices(scenarioData.choices);
+        setIsLoading(false);
+    };
+
+    if (preloadedScenario) {
+        setupGame(preloadedScenario);
+        setPreloadedScenario(null); 
+        preloadRandomScenario(); 
+    } else {
+        try {
+            const newScenario = await generateRandomScenario();
+            setupGame(newScenario);
+        } catch (error) {
+            console.error("Failed to start new game on demand:", error);
+            setStoryHistory([{ type: 'ai', text: 'Đã có lỗi xảy ra khi bắt đầu kịch bản mới. Vui lòng thử lại.' }]);
+        } finally {
+            setIsLoading(false);
+            preloadRandomScenario();
+        }
     }
   };
 
-  useEffect(() => {
-    startNewGame();
-  }, []);
-
   const handleChoice = async (choice: GameChoice) => {
     if (isLoading || gameEnded) return;
-
+  
     const newHistory: StoryPart[] = [...storyHistory, { type: 'player', text: choice.text }];
     setStoryHistory(newHistory);
-
+  
     const previousChoices = currentChoices;
     setCurrentChoices([]);
     setIsLoading(true);
-
+  
     try {
       const result: GameResultState = await getGameUpdate(newHistory, choice.text, previousChoices);
+      
       setStoryHistory(prev => [...prev, { type: 'ai', text: result.narrative }]);
       setAnalysis(result.analysis);
       setHistoricalOutcome(result.historicalOutcome);
       setSources(result.sources);
       setGameEnded(true);
+  
     } catch (error) {
       console.error("Failed to get game update:", error);
       setStoryHistory(prev => [...prev, { type: 'ai', text: 'Đã có lỗi xảy ra khi xử lý lựa chọn của bạn. Vui lòng bắt đầu lại.' }]);

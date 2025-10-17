@@ -1,18 +1,22 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import type { StoryPart, GameSetupState, GameResultState, GameChoice } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: "AIzaSyANZiFVmb_ZTBj4FEEbiYWDGoCLt9NUn54" });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
 const initialSystemInstruction = `Bạn là một AI quản trò cho một trò chơi văn bản tương tác về lịch sử Đảng Cộng sản Việt Nam. Phong cách của bạn là một nhà sử học hoặc chính ủy điềm tĩnh, khách quan.
 
-Nhiệm vụ của bạn là tạo ra một kịch bản khởi đầu hấp dẫn, đặt người chơi vào một thời điểm lịch sử quan trọng.
-1. Trình bày bối cảnh lịch sử chi tiết, các động lực và tình thế tiến thoái lưỡng nan.
-2. Cung cấp cho người chơi 3 lựa chọn có ý nghĩa, đại diện cho các con đường chiến lược, chính sách hoặc quan điểm tư tưởng khác nhau.
-3. PHẢI trả lời bằng định dạng JSON theo schema đã cung cấp.
+Nhiệm vụ của bạn là phát triển một kịch bản hấp dẫn từ bối cảnh được cung cấp.
+1. Dựa trên bối cảnh đã cho, hãy viết một đoạn tường thuật chi tiết, làm nổi bật các động lực và tình thế tiến thoái lưỡng nan.
+2. Từ tình thế đó, hãy tạo ra 3 lựa chọn có ý nghĩa cho người chơi, đại diện cho các con đường chiến lược, chính sách hoặc quan điểm tư tưởng khác nhau.
+3. PHẢI trả lời bằng định dạng JSON theo schema đã cung cấp.`;
 
-Bắt đầu bằng cách tạo một kịch bản ngẫu nhiên vào bất kỳ thời điểm nào trong lịch sử Đảng Cộng sản Việt Nam.
-Không trùng lặp quá về bối cảnh lịch sử (năm, sự kiện, nhân vật...). Mỗi kịch bản tiếp theo phải hoàn toàn ngẫu nhiên trong tiến trình lịch sử Đảng Cộng sản Việt Nam.`;
+const randomScenarioSystemInstruction = `Bạn là một AI quản trò cho một trò chơi văn bản tương tác về lịch sử Đảng Cộng sản Việt Nam. Phong cách của bạn là một nhà sử học hoặc chính ủy điềm tĩnh, khách quan.
+
+Nhiệm vụ của bạn là TỰ MÌNH SÁNG TẠO một kịch bản hoàn toàn mới và ngẫu nhiên.
+1.  Chọn một thời điểm hoặc sự kiện có thật nhưng ít được biết đến, hoặc một tình huống giả định hợp lý trong lịch sử của Đảng.
+2.  Viết một đoạn tường thuật chi tiết, đặt người chơi vào một tình thế tiến thoái lưỡng nan, đầy thách thức.
+3.  Tạo ra 3 lựa chọn có ý nghĩa, đại diện cho các con đường chiến lược, chính sách hoặc tư tưởng khác nhau.
+4.  PHẢI trả lời bằng định dạng JSON theo schema đã cung cấp.`;
 
 const responseSystemInstruction = `Bạn là một AI quản trò cho một trò chơi văn bản tương tác về lịch sử Đảng Cộng sản Việt Nam, đóng vai trò như một nhà sử học điềm tĩnh, khách quan. Người chơi vừa đưa ra một quyết định trong một kịch bản bạn đã tạo.
 
@@ -96,16 +100,21 @@ function buildPromptForNextTurn(history: StoryPart[], newChoice: string, availab
   return prompt;
 }
 
-const parseJsonResponse = (jsonText: string) => {
-    const cleanedJsonText = jsonText.replace(/^```json\s*|```$/g, '');
-    return JSON.parse(cleanedJsonText);
+export const parseJsonResponse = (jsonText: string): any => {
+    const cleanedJsonText = jsonText.replace(/^```json\s*|```$/g, '').trim();
+    try {
+        return JSON.parse(cleanedJsonText);
+    } catch (e) {
+        console.error("Failed to parse JSON:", cleanedJsonText);
+        throw new Error("Invalid JSON response from AI.");
+    }
 }
 
-export const getNewGame = async (): Promise<GameSetupState> => {
+export const getScenarioFromPrompt = async (prompt: string): Promise<GameSetupState> => {
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-pro",
-      contents: "Tạo một kịch bản trò chơi mới.",
+      contents: prompt,
       config: {
         systemInstruction: initialSystemInstruction,
         responseMimeType: "application/json",
@@ -122,6 +131,30 @@ export const getNewGame = async (): Promise<GameSetupState> => {
   } catch (error) {
     console.error("Lỗi khi gọi Gemini API để bắt đầu game:", error);
     throw new Error("Không thể nhận phản hồi từ AI để bắt đầu game.");
+  }
+};
+
+export const generateRandomScenario = async (): Promise<GameSetupState> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-pro",
+      contents: "Tạo một kịch bản lịch sử mới và ngẫu nhiên về Đảng Cộng sản Việt Nam.",
+      config: {
+        systemInstruction: randomScenarioSystemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: initialResponseSchema,
+        temperature: 0.9, 
+      },
+    });
+    const parsedResponse = parseJsonResponse(response.text);
+    if (parsedResponse.narrative && Array.isArray(parsedResponse.choices)) {
+      return parsedResponse as GameSetupState;
+    } else {
+      throw new Error("Phản hồi của AI để tạo kịch bản ngẫu nhiên có định dạng không hợp lệ.");
+    }
+  } catch (error) {
+    console.error("Lỗi khi gọi Gemini API để tạo kịch bản ngẫu nhiên:", error);
+    throw new Error("Không thể nhận phản hồi từ AI để tạo kịch bản ngẫu nhiên.");
   }
 };
 
@@ -143,10 +176,10 @@ export const getGameUpdate = async (history: StoryPart[], choice: string, availa
     });
 
     const parsedResponse = parseJsonResponse(response.text);
-    if (parsedResponse.narrative && parsedResponse.analysis && parsedResponse.historicalOutcome && Array.isArray(parsedResponse.sources)) {
-      return parsedResponse as GameResultState;
+    if (parsedResponse.narrative && parsedResponse.analysis && parsedResponse.historicalOutcome) {
+        return parsedResponse as GameResultState;
     } else {
-      throw new Error("Phản hồi của AI có định dạng không hợp lệ.");
+        throw new Error("Phản hồi của AI có định dạng không hợp lệ.");
     }
 
   } catch (error) {

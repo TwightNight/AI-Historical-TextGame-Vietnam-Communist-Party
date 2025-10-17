@@ -8,7 +8,6 @@ const StarIcon = () => (
   </svg>
 );
 
-
 const StorySegment: React.FC<StoryPart> = ({ type, text }) => {
   if (type === 'ai') {
     return (
