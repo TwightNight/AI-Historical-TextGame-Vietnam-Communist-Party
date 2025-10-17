@@ -1,15 +1,23 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import StorySegment from './components/StorySegment';
 import ChoiceButton from './components/ChoiceButton';
 import LoadingSpinner from './components/LoadingSpinner';
 import { getNewGame, getGameUpdate } from './services/geminiService';
-import type { StoryPart, GameChoice, GameSetupState, GameResultState } from './types';
+import type { StoryPart, GameChoice, GameSetupState, GameResultState, Source } from './types';
 
 // Book Icon SVG
 const HistoryIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-yellow-400 mr-3 flex-shrink-0">
       <path d="M11.25 4.533A9.707 9.707 0 006 3a9.735 9.735 0 00-3.25.555.75.75 0 00-.5.707v14.5a.75.75 0 00.5.707c1.728.348 3.449.555 5.25.555 1.773 0 3.493-.205 5.216-.552a.75.75 0 00.534-.709V5.25a.75.75 0 00-.534-.709A9.735 9.735 0 0012 3.75c-.563 0-1.123.033-1.68.097a.75.75 0 01-.72-.714z" />
       <path d="M12.75 5.66v12.585a8.217 8.217 0 01-1.5 0V4.533c.504-.047 1.004-.08 1.5-.08.496 0 .996.033 1.496.097a.75.75 0 01.707.721v12.585a8.217 8.217 0 01-1.5 0z" />
+    </svg>
+);
+
+// References Icon SVG
+const ReferencesIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-blue-400 mr-3 flex-shrink-0">
+      <path fillRule="evenodd" d="M4.5 2.25a.75.75 0 0 0 0 1.5v16.5a.75.75 0 0 0 1.5 0V3.75a.75.75 0 0 0-1.5 0zM7.5 2.25a.75.75 0 0 0 0 1.5v16.5a.75.75 0 0 0 1.5 0V3.75a.75.75 0 0 0-1.5 0zM12 2.25a.75.75 0 0 1 .75.75v16.5a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75zM15 3.75a.75.75 0 0 0-1.5 0v16.5a.75.75 0 0 0 1.5 0V3.75zM18.75 2.25a.75.75 0 0 0-.75.75v16.5a.75.75 0 0 0 1.5 0V3a.75.75 0 0 0-.75-.75z" clipRule="evenodd" />
     </svg>
 );
 
@@ -21,6 +29,7 @@ function App() {
   const [gameEnded, setGameEnded] = useState<boolean>(false);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [historicalOutcome, setHistoricalOutcome] = useState<string | null>(null);
+  const [sources, setSources] = useState<Source[] | null>(null);
   const storyEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -29,7 +38,7 @@ function App() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [storyHistory, isLoading, analysis, historicalOutcome]);
+  }, [storyHistory, isLoading, analysis, historicalOutcome, sources]);
 
   const startNewGame = async () => {
     setIsLoading(true);
@@ -38,6 +47,7 @@ function App() {
     setGameEnded(false);
     setAnalysis(null);
     setHistoricalOutcome(null);
+    setSources(null);
     try {
       const initialState: GameSetupState = await getNewGame();
       setStoryHistory([{ type: 'ai', text: initialState.narrative }]);
@@ -69,6 +79,7 @@ function App() {
       setStoryHistory(prev => [...prev, { type: 'ai', text: result.narrative }]);
       setAnalysis(result.analysis);
       setHistoricalOutcome(result.historicalOutcome);
+      setSources(result.sources);
       setGameEnded(true);
     } catch (error) {
       console.error("Failed to get game update:", error);
@@ -116,6 +127,30 @@ function App() {
                         <h2 className="text-xl font-bold text-yellow-400">Diễn Biến Lịch Sử Thực Tế</h2>
                     </div>
                     <p className="whitespace-pre-wrap text-yellow-200 font-serif leading-relaxed">{historicalOutcome}</p>
+                </div>
+            )}
+            
+            {!isLoading && sources && sources.length > 0 && (
+                <div className="p-4 bg-gray-900/50 rounded-lg border border-gray-700 animate-fade-in">
+                    <div className="flex items-center mb-3">
+                        <ReferencesIcon />
+                        <h2 className="text-xl font-bold text-blue-400">Nguồn Tham Khảo & Đọc Thêm</h2>
+                    </div>
+                    <ul className="space-y-3">
+                        {sources.map((source, index) => (
+                            <li key={index} className="flex items-start">
+                                <span className="text-blue-400 mr-2 mt-1">&#8227;</span>
+                                <a
+                                    href={source.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-300 hover:text-blue-200 hover:underline transition-colors duration-200"
+                                >
+                                    {source.title}
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             )}
           </div>

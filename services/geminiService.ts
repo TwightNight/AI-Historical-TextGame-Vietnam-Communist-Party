@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import type { StoryPart, GameSetupState, GameResultState, GameChoice } from '../types';
 
@@ -10,16 +11,18 @@ Nhiệm vụ của bạn là tạo ra một kịch bản khởi đầu hấp d�
 2. Cung cấp cho người chơi 3 lựa chọn có ý nghĩa, đại diện cho các con đường chiến lược, chính sách hoặc quan điểm tư tưởng khác nhau.
 3. PHẢI trả lời bằng định dạng JSON theo schema đã cung cấp.
 
-Bắt đầu bằng cách tạo một kịch bản ngẫu nhiên vào bất kỳ thời điểm nào trong Lịch sử Đảng Cộng sản Việt Nam.`;
+Bắt đầu bằng cách tạo một kịch bản ngẫu nhiên vào bất kỳ thời điểm nào trong lịch sử Đảng Cộng sản Việt Nam.
+Không trùng lặp quá về bối cảnh lịch sử (năm, sự kiện, nhân vật...). Mỗi kịch bản tiếp theo phải hoàn toàn ngẫu nhiên trong tiến trình lịch sử Đảng Cộng sản Việt Nam.`;
 
 const responseSystemInstruction = `Bạn là một AI quản trò cho một trò chơi văn bản tương tác về lịch sử Đảng Cộng sản Việt Nam, đóng vai trò như một nhà sử học điềm tĩnh, khách quan. Người chơi vừa đưa ra một quyết định trong một kịch bản bạn đã tạo.
 
 Nhiệm vụ của bạn là phân tích quyết định này trong một vòng chơi duy nhất.
 1.  **Tường thuật kết quả:** Dựa trên lựa chọn của người chơi, hãy mô tả chi tiết diễn biến lịch sử tiếp theo. Phần tường thuật này phải logic, tham chiếu đến các sự kiện có thật (nếu có thể) và phân tích hệ quả trực tiếp của lựa chọn đó.
 2.  **Phân tích các lựa chọn khác:** Sau phần tường thuật chính, hãy cung cấp một phân tích riêng biệt về những gì có khả năng xảy ra nếu người chơi đã chọn các phương án còn lại. Giải thích các kết quả giả định một cách hợp lý dựa trên bối cảnh lịch sử.
-3.  **Cung cấp sự kiện lịch sử thật:** Cuối cùng, trong một mục riêng, hãy mô tả ngắn gọn quyết định hoặc sự kiện thực tế đã xảy ra trong lịch sử liên quan đến bối cảnh bạn đã đưa ra.
-4.  **KHÔNG cung cấp lựa chọn mới.** Vòng chơi kết thúc ở đây.
-5.  Bạn PHẢI trả lời bằng định dạng JSON theo schema đã cung cấp.`;
+3.  **Cung cấp sự kiện lịch sử thật:** Trong một mục riêng, hãy mô tả ngắn gọn quyết định hoặc sự kiện thực tế đã xảy ra trong lịch sử liên quan đến bối cảnh bạn đã đưa ra.
+4.  **Dẫn nguồn tham khảo:** Cung cấp một danh sách (tối thiểu 2) các nguồn tài liệu hoặc bài viết uy tín (ví dụ: từ các trang báo chính thống, trang web của Đảng, chính phủ, hoặc các trang nghiên cứu lịch sử) liên quan đến sự kiện lịch sử này. Mỗi nguồn phải bao gồm tiêu đề và URL hợp lệ.
+5.  **KHÔNG cung cấp lựa chọn mới.** Vòng chơi kết thúc ở đây.
+6.  Bạn PHẢI trả lời bằng định dạng JSON theo schema đã cung cấp.`;
 
 
 const initialResponseSchema = {
@@ -55,9 +58,27 @@ const finalResponseSchema = {
         historicalOutcome: {
             type: Type.STRING,
             description: "Mô tả ngắn gọn về những gì đã thực sự xảy ra trong lịch sử liên quan đến kịch bản này."
+        },
+        sources: {
+            type: Type.ARRAY,
+            description: "Danh sách các nguồn tài liệu hoặc bài viết liên quan, mỗi nguồn có tiêu đề và URL.",
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    title: {
+                        type: Type.STRING,
+                        description: "Tiêu đề của nguồn tài liệu."
+                    },
+                    url: {
+                        type: Type.STRING,
+                        description: "URL hợp lệ của nguồn tài liệu."
+                    }
+                },
+                required: ['title', 'url']
+            }
         }
     },
-    required: ['narrative', 'analysis', 'historicalOutcome']
+    required: ['narrative', 'analysis', 'historicalOutcome', 'sources']
 };
 
 
@@ -122,7 +143,7 @@ export const getGameUpdate = async (history: StoryPart[], choice: string, availa
     });
 
     const parsedResponse = parseJsonResponse(response.text);
-    if (parsedResponse.narrative && parsedResponse.analysis && parsedResponse.historicalOutcome) {
+    if (parsedResponse.narrative && parsedResponse.analysis && parsedResponse.historicalOutcome && Array.isArray(parsedResponse.sources)) {
       return parsedResponse as GameResultState;
     } else {
       throw new Error("Phản hồi của AI có định dạng không hợp lệ.");
