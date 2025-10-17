@@ -1,11 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import type { StoryPart, GameSetupState, GameResultState, GameChoice } from '../types';
 
-if (!process.env.API_KEY) {
-  throw new Error("API_KEY environment variable not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: "AIzaSyANZiFVmb_ZTBj4FEEbiYWDGoCLt9NUn54" });
 
 const initialSystemInstruction = `Bạn là một AI quản trò cho một trò chơi văn bản tương tác về lịch sử Đảng Cộng sản Việt Nam. Phong cách của bạn là một nhà sử học hoặc chính ủy điềm tĩnh, khách quan.
 
