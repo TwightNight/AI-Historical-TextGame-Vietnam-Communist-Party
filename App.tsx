@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import StorySegment from './components/StorySegment';
 import ChoiceButton from './components/ChoiceButton';
 import LoadingSpinner from './components/LoadingSpinner';
-import { getScenarioFromPrompt, generateRandomScenario, getGameUpdate, parseJsonResponse } from './services/geminiService';
-import { SCENARIO_PROMPTS } from './services/scenarios';
+import { generateRandomScenario, getGameUpdate } from './services/geminiService';
+import { PREDEFINED_SCENARIOS } from './services/scenarios';
 import type { StoryPart, GameChoice, GameSetupState, GameResultState, Source } from './types';
 
 // Book Icon SVG
@@ -59,12 +59,11 @@ function App() {
   
   // Initial load effect
   useEffect(() => {
-    const initialSetup = async () => {
+    const initialSetup = () => { // Now synchronous
         setIsLoading(true);
         try {
-            const randomIndex = Math.floor(Math.random() * SCENARIO_PROMPTS.length);
-            const initialPrompt = SCENARIO_PROMPTS[randomIndex];
-            const initialState = await getScenarioFromPrompt(initialPrompt);
+            const randomIndex = Math.floor(Math.random() * PREDEFINED_SCENARIOS.length);
+            const initialState = PREDEFINED_SCENARIOS[randomIndex];
             setStoryHistory([{ type: 'ai', text: initialState.narrative }]);
             setCurrentChoices(initialState.choices);
             preloadRandomScenario(); 
@@ -106,7 +105,9 @@ function App() {
             setStoryHistory([{ type: 'ai', text: 'Đã có lỗi xảy ra khi bắt đầu kịch bản mới. Vui lòng thử lại.' }]);
         } finally {
             setIsLoading(false);
-            preloadRandomScenario();
+            if (!preloadedScenario) {
+              preloadRandomScenario();
+            }
         }
     }
   };

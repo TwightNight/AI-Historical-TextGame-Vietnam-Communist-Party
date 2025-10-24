@@ -3,13 +3,6 @@ import type { StoryPart, GameSetupState, GameResultState, GameChoice } from '../
 
 const ai = new GoogleGenAI({ apiKey: "AIzaSyANZiFVmb_ZTBj4FEEbiYWDGoCLt9NUn54" });
 
-const initialSystemInstruction = `Bạn là một AI quản trò cho một trò chơi văn bản tương tác về lịch sử Đảng Cộng sản Việt Nam. Phong cách của bạn là một nhà sử học hoặc chính ủy điềm tĩnh, khách quan.
-
-Nhiệm vụ của bạn là phát triển một kịch bản hấp dẫn từ bối cảnh được cung cấp.
-1. Dựa trên bối cảnh đã cho, hãy viết một đoạn tường thuật chi tiết, làm nổi bật các động lực và tình thế tiến thoái lưỡng nan.
-2. Từ tình thế đó, hãy tạo ra 3 lựa chọn có ý nghĩa cho người chơi, đại diện cho các con đường chiến lược, chính sách hoặc quan điểm tư tưởng khác nhau.
-3. PHẢI trả lời bằng định dạng JSON theo schema đã cung cấp.`;
-
 const randomScenarioSystemInstruction = `Bạn là một AI quản trò cho một trò chơi văn bản tương tác về lịch sử Đảng Cộng sản Việt Nam. Phong cách của bạn là một nhà sử học hoặc chính ủy điềm tĩnh, khách quan.
 
 Nhiệm vụ của bạn là TỰ MÌNH SÁNG TẠO một kịch bản hoàn toàn mới và ngẫu nhiên.
@@ -100,7 +93,7 @@ function buildPromptForNextTurn(history: StoryPart[], newChoice: string, availab
   return prompt;
 }
 
-export const parseJsonResponse = (jsonText: string): any => {
+function parseJsonResponse(jsonText: string): any {
     const cleanedJsonText = jsonText.replace(/^```json\s*|```$/g, '').trim();
     try {
         return JSON.parse(cleanedJsonText);
@@ -109,30 +102,6 @@ export const parseJsonResponse = (jsonText: string): any => {
         throw new Error("Invalid JSON response from AI.");
     }
 }
-
-export const getScenarioFromPrompt = async (prompt: string): Promise<GameSetupState> => {
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-pro",
-      contents: prompt,
-      config: {
-        systemInstruction: initialSystemInstruction,
-        responseMimeType: "application/json",
-        responseSchema: initialResponseSchema,
-        temperature: 0.8,
-      },
-    });
-    const parsedResponse = parseJsonResponse(response.text);
-    if (parsedResponse.narrative && Array.isArray(parsedResponse.choices)) {
-      return parsedResponse as GameSetupState;
-    } else {
-      throw new Error("Phản hồi của AI để bắt đầu game có định dạng không hợp lệ.");
-    }
-  } catch (error) {
-    console.error("Lỗi khi gọi Gemini API để bắt đầu game:", error);
-    throw new Error("Không thể nhận phản hồi từ AI để bắt đầu game.");
-  }
-};
 
 export const generateRandomScenario = async (): Promise<GameSetupState> => {
   try {
